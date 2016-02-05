@@ -55,7 +55,10 @@ public class Mysql {
 	public boolean dataIsexit(String tableName,long hashCode, String content) {
 		ResultSet resultSet = null;
 		try{
+			// 方式1
 			stat = conn.prepareStatement("select count(*) as rowCount from ".concat(tableName).concat(" where hashCode = ? and content = ? ;"));
+			// 方式2
+			//stat = conn.prepareStatement("select count(*) as rowCount from (select * from ".concat(tableName).concat(" where hashCode = ? and content = ? ) as counts ;"));
 			
 			stat.setLong(1, hashCode);
 			stat.setString(2, content);
@@ -63,6 +66,15 @@ public class Mysql {
 			
 	        resultSet.next();
 	        return resultSet.getInt("rowCount") == 0 ? false : true;
+			
+	        // 方式3
+			//stat = conn.prepareStatement("select * from ".concat(tableName).concat(" where hashCode = ? and content = ? ;"));
+			//stat.setLong(1, hashCode);
+			//stat.setString(2, content);
+			//resultSet = stat.executeQuery();
+			//return resultSet.next() == false ? false : true;
+			
+			//方式1:方式2:方式3 = 1:1.07923:1.03714 (方式一效率最高)
 		}catch(Exception e){
 			e.printStackTrace();
 			System.exit(0);
