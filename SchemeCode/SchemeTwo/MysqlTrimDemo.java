@@ -4,12 +4,14 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
 
 /**
- * 以数据库的方式对大文本内容进行去重,这速度也太慢了吧...
+ * 以数据库唯一索引的方式对大文本内容进行去重
  * @author Luzhuo
  */
 public class MysqlTrimDemo {
@@ -22,9 +24,9 @@ public class MysqlTrimDemo {
 		if(dataFile == null) return;
 		this.dataFile = dataFile;
 		if(saveFile == null)
-			this.saveFile = new File(dataFile.getParentFile(),"wordlist_01.txt");
+			this.saveFile = new File(dataFile.getParentFile(),"wordlist_0.txt");
 		else
-			this.saveFile = new File(saveFile,"wordlist_01.txt");
+			this.saveFile = new File(saveFile,"wordlist_0.txt");
 		
 		if(user == null || password == null) return;
 		mysql = new Mysql(sqlName, user, password);
@@ -32,9 +34,12 @@ public class MysqlTrimDemo {
 		// 创建表,删除在创建
 		mysql.inspectTable(tableName);
 		
-		// 1.读取一行,比较HashCode+Length和内容,不同写入数据库,相同丢弃
-		inspectHashCode();
+		// 1.读取一行,文本长度大于3则添加到数据库,否则丢弃
+		addWordList();
 		
+		// 2.读取数据库,写入文件,1G/个
+		writeFile();
+
 		mysql.closeConnection();
 		mysql = null;
 		System.out.println("trim任务完成...");
@@ -42,14 +47,11 @@ public class MysqlTrimDemo {
 
 
 	/**
-	 * 1.读取一行,比较HashCode+Length和内容,不同写入数据库,相同丢弃
+	 * 1.读取一行,文本长度大于3则添加到数据库,否则丢弃
 	 */
-	private void inspectHashCode() throws IOException {
+	private void addWordList() throws IOException {
 		// 获取指定目录下的所有文件
 		List<File> fileList = getFileList(dataFile);
-		
-		// 将筛选出来的数据序列化到文件
-		BufferedWriter saveWriter = new BufferedWriter(new FileWriter(saveFile));
 		
 		BufferedReader reader;
 		for (File file : fileList) {
@@ -58,13 +60,8 @@ public class MysqlTrimDemo {
 			String line = null;
 			while ((line = reader.readLine()) != null) {
 				if(line.length() > 3){
-					// 1.1 比较HashCode+内容长度和内容.不同则写入文件,并写入数据库,相同则丢弃
-					long dataHashCode = Long.decode(String.valueOf(line.hashCode()).concat(String.valueOf(line.length())));
-					boolean isexit = mysql.dataIsexit(tableName, dataHashCode, line);
-					if(!isexit){ // 存在
-						writerData(saveWriter, line);
-						mysql.add(tableName, dataHashCode, line);
-					}
+					// 1.直接添加到数据库
+					mysql.add(tableName, line);
 				}else{
 					System.out.println("长度不够: ".concat(line));
 				}
@@ -73,10 +70,44 @@ public class MysqlTrimDemo {
 		}
 		reader = null;
 
-		saveWriter.close();
 		fileList.clear();
 		fileList = null;
-		System.out.println("HashCode比较完成...");
+		System.out.println("添加到数据库完成...");
+	}
+	
+	private int tempFile = 0;
+	private int temp = 0;
+	private static final int max = 1 * 1024 * 1024 * 1024;
+	/**
+	 * 2.读取数据库,写入文件,1G/个
+	 * @throws IOException 
+	 * @throws SQLException 
+	 */
+	private void writeFile() throws IOException{
+		try{
+			// 将筛选出来的数据序列化到文件
+			BufferedWriter saveWriter = new BufferedWriter(new FileWriter(saveFile));
+			
+			// 查询数据库
+			ResultSet query = mysql.query(tableName);
+			if(query == null) return;
+			while(query.next()){
+				String line = query.getString("content");
+				writerData(saveWriter, line);
+				temp += line.length();
+				if(temp >= max) { 
+					tempFile ++;
+					saveWriter = new BufferedWriter(new FileWriter(new File(saveFile.getParentFile(),"wordlist_".concat(String.valueOf(tempFile)).concat(".txt"))));
+					temp = 0;
+				}
+			}
+			query.close();
+			saveWriter.close();
+			System.out.println("添加到文件完成...");
+		}catch(SQLException e){
+			e.printStackTrace();
+			System.exit(0);
+		}
 	}
 
 	/**

@@ -5,6 +5,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import com.mysql.jdbc.exceptions.MySQLIntegrityConstraintViolationException;
+
 /**
  * 数据库管理类
  * @author Luzhuo
@@ -39,10 +41,10 @@ public class Mysql {
 			// 删掉表,再进行创建
 			createStatement = conn.createStatement();
 			createStatement.execute("DROP TABLE ".concat(tableName).concat(";"));
-			createStatement.execute("CREATE TABLE ".concat(tableName).concat(" ( _id int primary key auto_increment, hashCode bigint, content varchar(255) )CHARACTER SET utf8;"));
+			createStatement.execute("CREATE TABLE ".concat(tableName).concat(" ( _id int primary key auto_increment, content varchar(255) binary, unique index(content) )CHARACTER SET utf8;"));
 		}catch(SQLException sqle){
 			try{
-				createStatement.execute("CREATE TABLE ".concat(tableName).concat(" ( _id int primary key auto_increment, hashCode bigint, content varchar(255) )CHARACTER SET utf8;"));
+				createStatement.execute("CREATE TABLE ".concat(tableName).concat(" ( _id int primary key auto_increment, content varchar(255) binary, unique index(content) )CHARACTER SET utf8;"));
 			}catch(Exception e){ e.printStackTrace(); }
 		}
 		
@@ -50,56 +52,17 @@ public class Mysql {
 	}
 
 	/**
-	 * 判断数据库是否存在该数据
-	 */
-	public boolean dataIsexit(String tableName,long hashCode, String content) {
-		ResultSet resultSet = null;
-		try{
-			// 方式1
-			stat = conn.prepareStatement("select count(*) as rowCount from ".concat(tableName).concat(" where hashCode = ? and content = ? ;"));
-			// 方式2
-			//stat = conn.prepareStatement("select count(*) as rowCount from (select * from ".concat(tableName).concat(" where hashCode = ? and content = ? ) as counts ;"));
-			
-			stat.setLong(1, hashCode);
-			stat.setString(2, content);
-			resultSet = stat.executeQuery();
-			
-	        resultSet.next();
-	        return resultSet.getInt("rowCount") == 0 ? false : true;
-			
-	        // 方式3
-			//stat = conn.prepareStatement("select * from ".concat(tableName).concat(" where hashCode = ? and content = ? ;"));
-			//stat.setLong(1, hashCode);
-			//stat.setString(2, content);
-			//resultSet = stat.executeQuery();
-			//return resultSet.next() == false ? false : true;
-			
-			//方式1:方式2:方式3 = 1:1.07923:1.03714 (方式一效率最高)
-		}catch(Exception e){
-			e.printStackTrace();
-			System.exit(0);
-		}finally{
-			try{
-				if(resultSet != null) resultSet.close();
-			}catch(Exception e){ resultSet = null; }
-			try{
-				if(stat != null) stat.close();
-			}catch(Exception e){ stat = null; }
-		}
-		return false;
-	}
-
-	/**
 	 * 添加到数据库
 	 */
-	public void add(String tableName,long hashCode, String content) {
+	public void add(String tableName, String content) {
 		try{
-			stat = conn.prepareStatement("insert into ".concat(tableName).concat(" values(null,?,?);"));
+			stat = conn.prepareStatement("insert into ".concat(tableName).concat(" values(null,?);"));
 			
-			stat.setLong(1, hashCode);
-			stat.setString(2, content);
+			stat.setString(1, content);
 			stat.executeUpdate();
 			
+		}catch(MySQLIntegrityConstraintViolationException a){
+			System.out.println(content.concat(":重复"));
 		}catch(Exception e){
 			e.printStackTrace();
 			System.exit(0);
@@ -109,5 +72,22 @@ public class Mysql {
 			}catch(Exception e){ stat = null; }
 		}
 	}
+	
+	/**
+	 * 查询数据库
+	 * @param tableName
+	 * @return
+	 */
+	public ResultSet query(String tableName){
+		try{
+			stat = conn.prepareStatement("select * from ".concat(tableName).concat(" ;"));
+			ResultSet executeQuery = stat.executeQuery();
+			return executeQuery;
+		}catch(Exception e){
+			e.printStackTrace();
+			System.exit(0);
+		}
+		return null;
+	};
 
 }
