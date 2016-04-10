@@ -181,7 +181,7 @@ public class WordListTrim {
 			reader = new BufferedReader(new FileReader(file));
 			String line = null;
 			while ((line = reader.readLine()) != null) {
-				if(line.length() > 3){
+				if(line.length() > 3 && line.length() <= 100){
 					// 1.1 比较HashCode+内容长度,相同则添加HashCode到集合中,并写入saveFile否则写入temFile
 					long dataHashCode = Long.decode(String.valueOf(line.hashCode()).concat(String.valueOf(line.length())));
 					boolean isAdd = hashCode.add(dataHashCode);

@@ -59,7 +59,7 @@ public class MysqlTrimDemo {
 			reader = new BufferedReader(new FileReader(file));
 			String line = null;
 			while ((line = reader.readLine()) != null) {
-				if(line.length() > 3){
+				if(line.length() > 3 && line.length() <= 100){
 					// 1.直接添加到数据库
 					mysql.add(tableName, line);
 				}else{
